@@ -2,9 +2,16 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <signal.h>
 #include <sys/types.h>
+
+#include <sys/wait.h>
 
 #define BUF_SIZE 1024
 
@@ -31,12 +38,17 @@ void logString(const char * msg, size_t bytes);
 static void sigIntHandler(int sig){
 
   if (curChildPID == -1){
-    printf("No child process executing\n");
+    logString("No child process executing\n", 27);
     return;
   }
 
+  char childPIDString[5];
+  // itoa(curChildPID, childPIDString, 10);
+
   // Send termination signal to child process
-  logString("Terminating child process %d\n", curChildPID);
+  logString("Terminating child process ", 26);
+  // logString(childPIDString, 5);
+  logString("\n", 1);
   kill(curChildPID, SIGINT);
 
 }
@@ -57,6 +69,34 @@ void processCmd(const char * cmd, ssize_t len){
 
   if (strcmp(cmd, "exit") == 0){
     readyToExit = 1;
+  }
+  else{
+
+    // Spawn a new process
+    curChildPID = fork();
+
+    if (curChildPID == -1){
+      logString("Could not run program", 21);
+    }
+    else if (curChildPID == 0){
+      int res = execl(cmd, cmd, NULL);
+
+      if (res == -1){
+        logString("exec failed\n", 12);
+        _exit(-1);
+      }
+    }
+    else{
+      logString("\n+++ Child [childPID] executes ", 31);
+      logString(cmd, len);
+      logString("\n", 1);
+
+      int status;
+      waitpid(curChildPID, &status, 0);
+      logString("Child [childPID] finished executing", 35);
+      logString(cmd, len);
+      logString("\n", 1);
+    }
   }
 
 }
@@ -93,7 +133,7 @@ int main(int argc, char **argv){
 
   while(readyToExit == 0){
 
-    printf("$ ");
+    logString("$ ", 2);
 
     bytesRead = read(STDIN_FILENO, input, BUF_SIZE - 1);
     input[bytesRead-1] = '\0';
