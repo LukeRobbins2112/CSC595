@@ -25,6 +25,8 @@ int logFD;
 int readyToExit = 0;
 int curChildPID = -2;
 
+int pipeFDs[2];
+
 //----------------------------------------------------------------
 // Builtin Function Paths
 //----------------------------------------------------------------
@@ -50,6 +52,7 @@ static void sigIntHandler(int sig){
     return;
   }
 
+  write(pipeFDs[1], "terminate child\n",16);
   char childPIDString[5];
   sprintf(childPIDString, "%d", curChildPID);
 
@@ -94,7 +97,7 @@ void processCmd(const char * cmd, ssize_t len){
       len = strlen(pwd);
     }
 
-    int pipeFDs[2];
+
     if (pipe(pipeFDs) == -1){
       perror("pipe");
       return;
