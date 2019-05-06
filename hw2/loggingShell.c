@@ -30,6 +30,7 @@ int curChildPID = -2;
 //----------------------------------------------------------------
 
 const char * ls = "/bin/ls";
+const char * pwd = "/bin/pwd";
 
 //----------------------------------------------------------------
 // Function declarations
@@ -67,6 +68,11 @@ void logString(const char * msg, size_t bytes){
 
 }
 
+void checkBuiltin(const char * cmd){
+
+  // TODO
+}
+
 void processCmd(const char * cmd, ssize_t len){
 
   logString("Processing command: ", 20);
@@ -83,15 +89,19 @@ void processCmd(const char * cmd, ssize_t len){
       cmd = ls;
       len = strlen(ls);
     }
-
-    // Spawn a new process
-    curChildPID = fork();
+    if (strcmp(cmd, "pwd") == 0){
+      cmd = pwd;
+      len = strlen(pwd);
+    }
 
     int pipeFDs[2];
     if (pipe(pipeFDs) == -1){
       perror("pipe");
       return;
     }
+
+    // Spawn a new process
+    curChildPID = fork();
 
     if (curChildPID == -1){
       logString("Could not run program\n", 22);
@@ -101,12 +111,12 @@ void processCmd(const char * cmd, ssize_t len){
       // Redirect output to the pipe
       dup2(pipeFDs[1], STDOUT_FILENO);
       close(pipeFDs[0]);
-      close(pipeFDs[1]);
+      // close(pipeFDs[1]);
 
       int res = execl(cmd, cmd, NULL);
 
       if (res == -1){
-        printf("exec failed\n", 12);
+        printf("exec failed\n");
         _exit(-1);
       }
 
@@ -114,7 +124,7 @@ void processCmd(const char * cmd, ssize_t len){
     else{
 
       // Read child process's output from pipe
-      close(pipeFDs[0]);
+      // close(pipeFDs[0]);
       ssize_t bytesRead;
       char childOutput[BUF_SIZE];
 
@@ -128,11 +138,10 @@ void processCmd(const char * cmd, ssize_t len){
       logString(" +++ \n", 6);
 
       // Get Child process's output
-      while((bytesRead = read(pipeFDs[1], childOutput, BUF_SIZE - 1)) > 0){
-        childOutput[bytesRead] = '\0';
-        logString(childOutput, bytesRead);
-        memset(childOutput, 0x0, BUF_SIZE);
-      }
+      bytesRead = read(pipeFDs[0], childOutput, BUF_SIZE - 1);
+      childOutput[bytesRead] = '\0';
+      logString(childOutput, bytesRead);
+      memset(childOutput, 0x0, BUF_SIZE);
 
       int status;
       waitpid(curChildPID, &status, 0);
