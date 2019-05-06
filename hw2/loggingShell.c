@@ -201,6 +201,8 @@ int main(int argc, char **argv){
 
   }
 
+  logString("Exiting logger shell\n", 21);
+
   // CLose log file
   if (close(logFD) == -1){
     perror("close");
