@@ -23,7 +23,13 @@ const char * USAGE = "USAGE loggingShell [logfile]\n";
 int logFD;
 
 int readyToExit = 0;
-int curChildPID = -1;
+int curChildPID = -2;
+
+//----------------------------------------------------------------
+// Builtin Function Paths
+//----------------------------------------------------------------
+
+const char * ls = "/bin/ls";
 
 //----------------------------------------------------------------
 // Function declarations
@@ -37,17 +43,18 @@ void logString(const char * msg, size_t bytes);
 
 static void sigIntHandler(int sig){
 
-  if (curChildPID == -1){
+  if (curChildPID == -2){
     logString("No child process executing\n", 27);
+    logString("$ ", 2);
     return;
   }
 
   char childPIDString[5];
-  // itoa(curChildPID, childPIDString, 10);
+  sprintf(childPIDString, "%d", curChildPID);
 
   // Send termination signal to child process
   logString("Terminating child process ", 26);
-  // logString(childPIDString, 5);
+  logString(childPIDString, 5);
   logString("\n", 1);
   kill(curChildPID, SIGINT);
 
@@ -72,30 +79,70 @@ void processCmd(const char * cmd, ssize_t len){
   }
   else{
 
+    if (strcmp(cmd, "ls") == 0){
+      cmd = ls;
+      len = strlen(ls);
+    }
+
     // Spawn a new process
     curChildPID = fork();
 
+    int pipeFDs[2];
+    if (pipe(pipeFDs) == -1){
+      perror("pipe");
+      return;
+    }
+
     if (curChildPID == -1){
-      logString("Could not run program", 21);
+      logString("Could not run program\n", 22);
     }
     else if (curChildPID == 0){
+
+      // Redirect output to the pipe
+      dup2(pipeFDs[1], STDOUT_FILENO);
+      close(pipeFDs[0]);
+      close(pipeFDs[1]);
+
       int res = execl(cmd, cmd, NULL);
 
       if (res == -1){
-        logString("exec failed\n", 12);
+        printf("exec failed\n", 12);
         _exit(-1);
       }
+
     }
     else{
-      logString("\n+++ Child [childPID] executes ", 31);
+
+      // Read child process's output from pipe
+      close(pipeFDs[0]);
+      ssize_t bytesRead;
+      char childOutput[BUF_SIZE];
+
+      char childPIDString[5];
+      sprintf(childPIDString, "%d", curChildPID);
+
+      logString("\n+++ Child ", 11);
+      logString(childPIDString, 5);
+      logString(" executes ", 10);
       logString(cmd, len);
-      logString("\n", 1);
+      logString(" +++ \n", 6);
+
+      // Get Child process's output
+      while((bytesRead = read(pipeFDs[1], childOutput, BUF_SIZE - 1)) > 0){
+        childOutput[bytesRead] = '\0';
+        logString(childOutput, bytesRead);
+        memset(childOutput, 0x0, BUF_SIZE);
+      }
 
       int status;
       waitpid(curChildPID, &status, 0);
-      logString("Child [childPID] finished executing", 35);
+      logString("+++ Child ", 10);
+      logString(childPIDString, 5);
+      logString(" finished executing ", 20);
       logString(cmd, len);
-      logString("\n", 1);
+      logString(" +++ \n", 6);
+
+      curChildPID = -2;
     }
   }
 
@@ -117,7 +164,7 @@ int main(int argc, char **argv){
 
   // Create file to be used for logging
 
-  int flags = O_WRONLY | O_CREAT | O_APPEND;
+  int flags = O_WRONLY | O_CREAT | O_APPEND | O_TRUNC;
   int mode = S_IRWXU;
   logFD = open(argv[1], flags, mode);
 
