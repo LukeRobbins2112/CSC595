@@ -117,6 +117,7 @@ void processCmd(const char * cmd, ssize_t len){
 
       if (res == -1){
         printf("exec failed\n");
+        write(pipeFDs[1], "exec failed\n", 12);
         _exit(-1);
       }
 
