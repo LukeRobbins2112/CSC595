@@ -32,7 +32,7 @@ int exec(void * args)
     char const * const hostname = "CSC595";
     // Set a new hostname
     // Use print_err to print error if sethostname fails
-    result = sethostname(hostname, strlen(hostname) + 1);
+    result = sethostname(hostname, strlen(hostname));
 
     if (result != 0){
       print_err("sethostname");
@@ -40,12 +40,16 @@ int exec(void * args)
 
     // Create a message queue
     // USe print_err to print error if creating message queue fails
-
+    result = msgget(0, IPC_CREAT | 0666);
+    if (result != 0){
+      print_err("msgget");
+    }
 
 
     char ** const argv = args;
     // Execute the given command
     // Use print_err to print error if execvp fails
+    execvp(argv[0], argv);
 
 
     return 0;
@@ -67,6 +71,7 @@ int main(int argc, char ** argv)
         print_err("calling clone");
         return 1;
     }
+
     // Wait for the process to finish
     int status = 0;
     if (waitpid(pid, &status, 0) == -1) {
