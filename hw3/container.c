@@ -91,19 +91,22 @@ int main(int argc, char ** argv)
         return 1;
     }
 
+    int numNamespaces = atoi(argv[1]);
 
     // Initialize params struct
     struct params * userParams = (struct params *)malloc(sizeof(struct params));
-    userParams->cmd = (char *)malloc(strlen(argv[1]) + 1);
-    strcpy(userParams->cmd, argv[1]);
+    userParams->cmd = (char *)malloc(strlen(argv[2]) + 1);
+    strcpy(userParams->cmd, argv[2]);
 
-    userParams->cpu_pct = atoi(argv[2]);
-    userParams->mem_limit = atoi(argv[3]);
-    userParams->num_levels = atoi(argv[4]);
+
+
+    userParams->cpu_pct = atoi(argv[3]);
+    userParams->mem_limit = atoi(argv[4]);
+    userParams->num_levels = atoi(argv[5]);
 
     // Fill in additional args
     userParams->argc = 0;
-    int numArgs = argc - 5;
+    int numArgs = argc - 6;
     if (numArgs > 0){
       userParams->argv = (char **)malloc((sizeof(char *) * numArgs) + 1);
       userParams->argc = numArgs;
@@ -115,20 +118,24 @@ int main(int argc, char ** argv)
       userParams->argv[1] = NULL;
     }
 
-    for (int i = 5; i < argc; i++){
-      userParams->argv[i-5] = (char *)malloc(strlen(argv[i]) + 1);
-      strcpy(userParams->argv[i - 5], argv[i]);
+    for (int i = 6; i < argc; i++){
+      userParams->argv[i-6] = (char *)malloc(strlen(argv[i]) + 1);
+      strcpy(userParams->argv[i - 6], argv[i]);
     }
 
     // Namespace flags
     // ADD more flags
     const int flags = SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWUSER;
 
-    // Create a new child process
-    pid_t pid = clone(exec, stack + STACKSIZE, flags, (void *)userParams);
-    if (pid < 0) {
+    pid_t pid;
+    for(int i = 0; i < numNamespaces; i++){
+
+      // Create a new child process
+      pid = clone(exec, stack + STACKSIZE, flags, (void *)userParams);
+      if (pid < 0) {
         print_err("calling clone");
         return 1;
+      }
     }
 
     // Wait for the process to finish
