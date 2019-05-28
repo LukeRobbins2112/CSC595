@@ -16,6 +16,7 @@ struct params{
 
   char * cmd;
   char ** argv;
+  int argc;
   int cpu_pct;
   int mem_limit;
   int num_levels;
@@ -30,9 +31,24 @@ void print_err(char const * const reason)
 }
 int exec(void * args)
 {
+
+  // Validate passing of struct
+  struct params * userParams = ((struct params *)args);
+
+  printf("cmd: %s\n", userParams->cmd);
+  printf("cpu_pct: %d\n", userParams->cpu_pct);
+  printf("mem_limit: %d\n", userParams->mem_limit);
+  printf("num_levels: %d\n", userParams->num_levels);
+
+  for (int i = 0; i < userParams->argc; i++){
+    printf("Arg #%d: %s\n", i, userParams->argv[i]);
+  }
+
     // Remount proc
     // Use print_err to print error if mount fails
-  // int mount(const char *source, const char *target, const char *filesystemtype, unsigned long mountflags, const void *data);
+  // int mount(const char *source, const char *target,
+            // const char *filesystemtype, unsigned long mountflags, const void *data);
+
 
   int result;
   result = mount("proc", "/proc", "proc", 0, NULL);
@@ -57,10 +73,12 @@ int exec(void * args)
     }
 
 
-    char ** const argv = args;
     // Execute the given command
     // Use print_err to print error if execvp fails
-    execvp(argv[0], argv);
+    result = execvp(userParams->cmd, userParams->argv);
+    if (result != 0){
+      print_err("execvp");
+    }
 
 
     return 0;
@@ -75,32 +93,31 @@ int main(int argc, char ** argv)
 
 
     // Initialize params struct
-    struct params userParams;
-    userParams.cmd = (char *)malloc(strlen(argv[1]) + 1);
-    strcpy(userParams.cmd, argv[1]);
+    struct params * userParams = (struct params *)malloc(sizeof(struct params));
+    userParams->cmd = (char *)malloc(strlen(argv[1]) + 1);
+    strcpy(userParams->cmd, argv[1]);
 
-    userParams.cpu_pct = atoi(argv[2]);
-    userParams.mem_limit = atoi(argv[3]);
-    userParams.num_levels = atoi(argv[4]);
+    userParams->cpu_pct = atoi(argv[2]);
+    userParams->mem_limit = atoi(argv[3]);
+    userParams->num_levels = atoi(argv[4]);
 
     // Fill in additional args
+    userParams->argc = 0;
     int numArgs = argc - 5;
     if (numArgs > 0){
-      userParams.argv = (char **)malloc(sizeof(char *) * numArgs);
+      userParams->argv = (char **)malloc((sizeof(char *) * numArgs) + 1);
+      userParams->argc = numArgs;
+      userParams->argv[numArgs] = NULL;
+    }
+    else{
+      userParams->argv = (char **)malloc(sizeof(char *) * 2);
+      userParams->argv[0] = "";
+      userParams->argv[1] = NULL;
     }
 
     for (int i = 5; i < argc; i++){
-      userParams.argv[i-5] = (char *)malloc(strlen(argv[i]) + 1);
-      strcpy(userParams.argv[i - 5], argv[i]);
-    }
-
-    printf("cmd: %s\n", userParams.cmd);
-    printf("cpu_pct: %d\n", userParams.cpu_pct);
-    printf("mem_limit: %d\n", userParams.mem_limit);
-    printf("num_levels: %d\n", userParams.num_levels);
-
-    for (int i = 0; i < numArgs; i++){
-      printf("Arg #%d: %s\n", i, userParams.argv[i]);
+      userParams->argv[i-5] = (char *)malloc(strlen(argv[i]) + 1);
+      strcpy(userParams->argv[i - 5], argv[i]);
     }
 
     // Namespace flags
@@ -108,7 +125,7 @@ int main(int argc, char ** argv)
     const int flags = SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWUSER;
 
     // Create a new child process
-    pid_t pid = clone(exec, stack + STACKSIZE, flags, &argv[1]);
+    pid_t pid = clone(exec, stack + STACKSIZE, flags, (void *)userParams);
     if (pid < 0) {
         print_err("calling clone");
         return 1;
