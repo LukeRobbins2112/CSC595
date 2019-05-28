@@ -24,3 +24,8 @@ sudo cp /bin/bash bin
 # run the bash executable within the chroot
 cd ..
 sudo chroot ./new-root /bin/bash
+cd
+cd .
+pwd
+echo test > foo.txt
+less foo.txt
